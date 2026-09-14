@@ -1,0 +1,39 @@
+backend:
+  name: github
+  repo: TON-COMPTE-GITHUB/lcv-amo   # ⚠️ à remplacer par le vrai dépôt GitHub (ex: meganepb/lcv-amo)
+  branch: main
+  base_url: https://TON-WORKER.workers.dev   # ⚠️ à remplacer par l'URL du relais OAuth (voir oauth-worker/README.md)
+  auth_endpoint: auth
+
+# Après une publication depuis /admin, Decap commit le fichier Markdown sur GitHub.
+# Le workflow .github/workflows/deploy.yml régénère alors automatiquement les pages du blog
+# (node scripts/build-blog.js) puis déploie le site mis à jour sur Hostinger.
+
+media_folder: "content/uploads"
+public_folder: "/content/uploads"
+
+publish_mode: simple
+locale: "fr"
+
+collections:
+  - name: "blog"
+    label: "Articles du blog"
+    label_singular: "Article"
+    folder: "content/blog"
+    create: true
+    delete: true
+    slug: "{{slug}}"
+    identifier_field: title
+    summary: "{{title}} — {{date}}"
+    sortable_fields: ["date", "title"]
+    fields:
+      - { label: "Titre", name: "title", widget: "string" }
+      - { label: "Identifiant URL (slug)", name: "slug", widget: "string", hint: "Sans espaces ni accents, ex: mon-nouvel-article. Détermine l'adresse de la page (/blog/mon-nouvel-article.html)." }
+      - { label: "Date de publication", name: "date", widget: "datetime", format: "YYYY-MM-DD", date_format: "DD/MM/YYYY", time_format: false }
+      - label: "Catégorie"
+        name: "category"
+        widget: "select"
+        options: ["Collectivités", "Étapes de projet", "Comprendre l'AMO", "Immobilier privé", "Immobilier d'entreprise", "Réglementation", "Actualités"]
+      - { label: "Résumé (pour la liste des articles et le référencement)", name: "excerpt", widget: "text" }
+      - { label: "Image de couverture", name: "cover", widget: "image", required: false, media_library: { config: { multiple: false } } }
+      - { label: "Contenu de l'article", name: "body", widget: "markdown" }

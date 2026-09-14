@@ -1,0 +1,13 @@
+{
+  "name": "La Clef de Voûte — Assistance à Maîtrise d'Ouvrage",
+  "short_name": "La Clef de Voûte",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FAF9F6",
+  "theme_color": "#242E47",
+  "lang": "fr",
+  "icons": [
+    { "src": "/assets/img/favicon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/assets/img/favicon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
