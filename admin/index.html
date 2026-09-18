@@ -16,13 +16,10 @@
   }
   .lien-tableau-de-bord:hover { background: #5F1C45; }
 </style>
-<!-- Decap CMS (ex Netlify CMS), back-office de publication du blog -->
-<!-- React/ReactDOM chargés séparément : les versions récentes de decap-cms-app (React 19)
-     n'ont plus de build UMD disponible sur les CDN, on reste donc sur une version de
-     decap-cms-app compatible React 18 (qui a un UMD stable). -->
-<script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js" crossorigin></script>
-<script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-<script src="https://cdn.jsdelivr.net/npm/decap-cms-app@3.6.4/dist/decap-cms-app.js"></script>
+<!-- Decap CMS (ex Netlify CMS), back-office de publication du blog. -->
+<!-- Le paquet "decap-cms" (autonome, React inclus, s'initialise tout seul) est utilisé
+     ici plutôt que "decap-cms-app" (librairie bas niveau qui ne s'auto-démarre pas). -->
+<script src="https://cdn.jsdelivr.net/npm/decap-cms@3.16.2/dist/decap-cms.js"></script>
 </head>
 <body>
 <a class="lien-tableau-de-bord" href="tableau-de-bord.php">📊 Tableau de bord</a>
