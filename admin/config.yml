@@ -1,8 +1,8 @@
 backend:
   name: github
-  repo: TON-COMPTE-GITHUB/lcv-amo   # ⚠️ à remplacer par le vrai dépôt GitHub (ex: meganepb/lcv-amo)
+  repo: meganeedard-netizen/lcv-amo
   branch: main
-  base_url: https://TON-WORKER.workers.dev   # ⚠️ à remplacer par l'URL du relais OAuth (voir oauth-worker/README.md)
+  base_url: https://lcv-amo-cms-auth.megane-edard.workers.dev
   auth_endpoint: auth
 
 # Après une publication depuis /admin, Decap commit le fichier Markdown sur GitHub.
