@@ -8,10 +8,18 @@
 <link rel="icon" href="/assets/img/favicon.ico" sizes="any">
 <style>
   body { font-family: -apple-system, sans-serif; }
+  .lien-tableau-de-bord {
+    position: fixed; top: 14px; right: 18px; z-index: 9999;
+    font-family: -apple-system, sans-serif; font-size: 13px; font-weight: 600;
+    background: #862762; color: #fff; padding: 8px 14px; border-radius: 999px;
+    text-decoration: none; box-shadow: 0 6px 16px -6px rgba(0,0,0,.3);
+  }
+  .lien-tableau-de-bord:hover { background: #5F1C45; }
 </style>
 <!-- Decap CMS (ex Netlify CMS), back-office de publication du blog -->
 <script src="https://cdn.jsdelivr.net/npm/decap-cms-app@^3/dist/decap-cms-app.js"></script>
 </head>
 <body>
+<a class="lien-tableau-de-bord" href="tableau-de-bord.php">📊 Tableau de bord</a>
 </body>
 </html>

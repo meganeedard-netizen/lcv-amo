@@ -85,3 +85,19 @@ le bloc JSON-LD une fois le numéro connu.
 
 Quelques minutes plus tard, l'article est en ligne automatiquement (Decap
 commit le fichier → GitHub Actions régénère le blog → déploiement Hostinger).
+
+## 8. Tableau de bord (statistiques + demandes de contact)
+
+Accessible sur `https://lcv-amo.fr/admin/tableau-de-bord.php`, protégé par
+mot de passe (indépendant du compte GitHub). Depuis cette page, un bouton
+« Publier un article de blog » renvoie vers `/admin/` (Decap CMS).
+
+- **Compteur de visites** : anonyme, sans cookie, alimenté par `track.php`
+  (appelé automatiquement par `assets/js/main.js` sur chaque page publique).
+- **Historique des demandes** : chaque envoi du formulaire de contact est
+  enregistré en plus de l'email (les 500 demandes les plus récentes).
+- Les données sont stockées dans `data/visits.json` et `data/contacts.json`
+  directement sur le serveur Hostinger (dossier protégé par `.htaccess`,
+  jamais versionné dans Git — donc jamais écrasé par un déploiement).
+- Le mot de passe est un hash bcrypt dans `admin/auth-config.php` (voir ce
+  fichier pour la procédure de changement).

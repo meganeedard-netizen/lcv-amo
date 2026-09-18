@@ -75,6 +75,15 @@
     }
   }
 
+  /* Compteur de visites anonyme (pas de cookie, pas de donnée personnelle) */
+  if (location.pathname.indexOf("/admin") !== 0) {
+    fetch("/track.php", {
+      method: "POST",
+      body: new URLSearchParams({ page: location.pathname }),
+      keepalive: true
+    }).catch(function () {});
+  }
+
   /* Année courante dans le footer */
   document.querySelectorAll("[data-year]").forEach(function (el) {
     el.textContent = new Date().getFullYear();
