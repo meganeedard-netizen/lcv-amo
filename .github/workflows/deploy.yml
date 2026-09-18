@@ -23,6 +23,34 @@ jobs:
       - name: Génération du blog (Markdown → HTML) et du sitemap
         run: npm run build
 
+      - name: Génération de la config SMTP (secrets GitHub)
+        env:
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+        run: |
+          python3 - <<'PY'
+          import os
+
+          def esc(s):
+              return s.replace('\\', '\\\\').replace("'", "\\'")
+
+          user = esc(os.environ['SMTP_USER'])
+          password = esc(os.environ['SMTP_PASSWORD'])
+
+          content = (
+              "<?php\n"
+              "return [\n"
+              "    'smtp_host' => 'smtp.hostinger.com',\n"
+              "    'smtp_port' => 465,\n"
+              f"    'smtp_user' => '{user}',\n"
+              f"    'smtp_pass' => '{password}',\n"
+              "];\n"
+          )
+
+          with open('mail-config.php', 'w') as f:
+              f.write(content)
+          PY
+
       - name: Déploiement FTP vers Hostinger
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:

@@ -1,16 +1,95 @@
 <?php
 /**
  * Traitement du formulaire de contact, La Clef de Voûte
- * Envoie un email à contact@lcv-amo.fr via la fonction mail() de l'hébergeur (Hostinger).
+ * Envoie un email à contact@lcv-amo.fr via SMTP authentifié (PHPMailer),
+ * plus fiable sur mutualisé Hostinger que la fonction mail() native.
  */
+
+require __DIR__ . '/lib/PHPMailer/Exception.php';
+require __DIR__ . '/lib/PHPMailer/PHPMailer.php';
+require __DIR__ . '/lib/PHPMailer/SMTP.php';
+
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception as PHPMailerException;
 
 header('Content-Type: application/json; charset=utf-8');
 
 $destinataire = 'contact@lcv-amo.fr';
 
+$mailConfig = @include __DIR__ . '/mail-config.php';
+if (!is_array($mailConfig)) {
+    http_response_code(500);
+    error_log('lcv-amo: mail-config.php manquant ou invalide');
+    echo json_encode(['ok' => false, 'message' => "Erreur de configuration de l'envoi."]);
+    exit;
+}
+
+function envoyerEmail(array $mailConfig, $destinataire, $sujet, $corps, $replyToNom = null, $replyToEmail = null) {
+    $mail = new PHPMailer(true);
+    try {
+        $mail->isSMTP();
+        $mail->Host       = $mailConfig['smtp_host'];
+        $mail->SMTPAuth   = true;
+        $mail->Username   = $mailConfig['smtp_user'];
+        $mail->Password   = $mailConfig['smtp_pass'];
+        $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+        $mail->Port       = $mailConfig['smtp_port'];
+        $mail->CharSet    = 'UTF-8';
+
+        $mail->setFrom($mailConfig['smtp_user'], 'La Clef de Voûte');
+        $mail->addAddress($destinataire);
+        if ($replyToEmail) {
+            $mail->addReplyTo($replyToEmail, $replyToNom ?: $replyToEmail);
+        }
+
+        $mail->Subject = $sujet;
+        $mail->Body    = $corps;
+
+        $mail->send();
+        return true;
+    } catch (PHPMailerException $e) {
+        error_log('lcv-amo: échec envoi email SMTP - ' . $mail->ErrorInfo);
+        return false;
+    }
+}
+
 function repondre($ok, $message) {
     echo json_encode(['ok' => $ok, 'message' => $message]);
     exit;
+}
+
+function enregistrerDemande($entree) {
+    $dataDir = __DIR__ . '/data';
+    $file = $dataDir . '/contacts.json';
+
+    if (!is_dir($dataDir)) {
+        mkdir($dataDir, 0755, true);
+    }
+    if (!file_exists($dataDir . '/.htaccess')) {
+        file_put_contents($dataDir . '/.htaccess', "Require all denied\n");
+    }
+
+    $fp = fopen($file, 'c+');
+    if (!$fp || !flock($fp, LOCK_EX)) {
+        error_log('lcv-amo: impossible d\'enregistrer la demande dans data/contacts.json');
+        return;
+    }
+
+    $contenu = stream_get_contents($fp);
+    $data = json_decode($contenu, true);
+    if (!is_array($data)) {
+        $data = [];
+    }
+
+    array_unshift($data, $entree);
+    $data = array_slice($data, 0, 500); // garde les 500 demandes les plus récentes
+
+    ftruncate($fp, 0);
+    rewind($fp);
+    fwrite($fp, json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+    fflush($fp);
+    flock($fp, LOCK_UN);
+    fclose($fp);
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -50,12 +129,7 @@ $corps .= "Téléphone : {$telephone}\n";
 $corps .= "Type de projet : {$typeProjet}\n\n";
 $corps .= "Message :\n{$message}\n";
 
-$headers   = [];
-$headers[] = 'From: Site La Clef de Voûte <contact@lcv-amo.fr>';
-$headers[] = 'Reply-To: ' . $nom . ' <' . $email . '>';
-$headers[] = 'Content-Type: text/plain; charset=UTF-8';
-
-$envoye = mail($destinataire, '=?UTF-8?B?' . base64_encode($sujet) . '?=', $corps, implode("\r\n", $headers));
+$envoye = envoyerEmail($mailConfig, $destinataire, $sujet, $corps, $nom, $email);
 
 if ($envoye) {
     // Email de confirmation envoyé au visiteur
@@ -67,12 +141,17 @@ if ($envoye) {
     $corpsConfirmation .= "À très bientôt,\n";
     $corpsConfirmation .= "La Clef de Voûte, Assistance à Maîtrise d'Ouvrage\n";
 
-    $headersConfirmation   = [];
-    $headersConfirmation[] = 'From: La Clef de Voûte <contact@lcv-amo.fr>';
-    $headersConfirmation[] = 'Reply-To: contact@lcv-amo.fr';
-    $headersConfirmation[] = 'Content-Type: text/plain; charset=UTF-8';
+    envoyerEmail($mailConfig, $email, $sujetConfirmation, $corpsConfirmation);
 
-    mail($email, '=?UTF-8?B?' . base64_encode($sujetConfirmation) . '?=', $corpsConfirmation, implode("\r\n", $headersConfirmation));
+    enregistrerDemande([
+        'date'        => date('c'),
+        'nom'         => $nom,
+        'structure'   => $structure,
+        'email'       => $email,
+        'telephone'   => $telephone,
+        'type_projet' => $typeProjet,
+        'message'     => $message
+    ]);
 
     repondre(true, 'Message envoyé.');
 } else {
