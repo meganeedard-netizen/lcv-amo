@@ -60,6 +60,7 @@ jobs:
           protocol: ftps
           local-dir: ./
           server-dir: ./
+          state-name: .ftp-deploy-sync-state-2026-09-21.json
           exclude: |
             **/.git*
             **/.git*/**
