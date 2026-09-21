@@ -51,6 +51,26 @@ jobs:
               f.write(content)
           PY
 
+      - name: Génération du jeton de publication du blog (secret GitHub)
+        env:
+          CMS_GITHUB_TOKEN: ${{ secrets.CMS_GITHUB_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import os
+
+          token = os.environ['CMS_GITHUB_TOKEN'].replace('\\', '\\\\').replace("'", "\\'")
+
+          content = (
+              "<?php\n"
+              "return [\n"
+              f"    'token' => '{token}',\n"
+              "];\n"
+          )
+
+          with open('admin/cms-token.php', 'w') as f:
+              f.write(content)
+          PY
+
       - name: Déploiement FTP vers Hostinger
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:

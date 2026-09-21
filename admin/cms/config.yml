@@ -34,6 +34,7 @@ collections:
         name: "category"
         widget: "select"
         options: ["Collectivités", "Étapes de projet", "Comprendre l'AMO", "Immobilier privé", "Immobilier d'entreprise", "Réglementation", "Actualités"]
+      - { label: "Sous-titre", name: "subtitle", widget: "string", required: false }
       - { label: "Résumé (pour la liste des articles et le référencement)", name: "excerpt", widget: "text" }
       - { label: "Image de couverture", name: "cover", widget: "image", required: false, media_library: { config: { multiple: false } } }
       - { label: "Contenu de l'article", name: "body", widget: "markdown" }

@@ -185,6 +185,7 @@ ${header(true)}
       <div class="breadcrumb"><a href="../index.html">Accueil</a> / <a href="index.html">Blog</a> / ${post.title}</div>
       <span class="eyebrow">${post.category}</span>
       <h1>${post.title}</h1>
+      ${post.subtitle ? `<p class="lede">${post.subtitle}</p>` : ""}
       <div class="article-meta">
         <span>Par Fanny Prieto</span>
         <span>${fmtDate(post.date)}</span>
@@ -297,6 +298,7 @@ function main() {
     return {
       slug,
       title: data.title || slug,
+      subtitle: data.subtitle || "",
       date: data.date || new Date().toISOString(),
       category: data.category || "Actualités",
       excerpt: data.excerpt || "",
