@@ -168,7 +168,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES) && 
 
         // Vignette : nouvelle photo, sinon celle déjà en place
         if (fichier_upload_valide('vignette')) {
-            $donneesVignette = image_vers_jpeg_optimise($_FILES['vignette']['tmp_name']);
+            $donneesVignette = image_vers_jpeg_recadree($_FILES['vignette']['tmp_name']);
             $cheminVignette = "content/uploads/$slug-vignette.jpg";
             $vignetteExistante = gh_get_file($cheminVignette);
             gh_put_file($cheminVignette, $donneesVignette, "Ajoute la vignette de l'article \"{$valeurs['titre']}\"", $vignetteExistante['sha'] ?? null);
