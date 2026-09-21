@@ -75,8 +75,16 @@
     }
   }
 
-  /* Compteur de visites anonyme (pas de cookie, pas de donnée personnelle) */
-  if (location.pathname.indexOf("/admin") !== 0) {
+  /* Compteur de visites anonyme (pas de cookie de suivi, pas de donnée personnelle) */
+  /* Repère technique pour exclure les visites de Mégane elle-même du compteur : */
+  /* visiter une fois https://lcv-amo.fr/?proprietaire=1 pose un repère local, sans lien avec les visiteurs. */
+  if (/[?&]proprietaire=1(&|$)/.test(location.search)) {
+    document.cookie = "lcv_proprietaire=1; max-age=31536000; path=/";
+    var urlSansParam = location.pathname + location.hash;
+    history.replaceState(null, "", urlSansParam);
+  }
+  var estProprietaire = /(^|;\s*)lcv_proprietaire=1(;|$)/.test(document.cookie);
+  if (location.pathname.indexOf("/admin") !== 0 && !estProprietaire) {
     fetch("/track.php", {
       method: "POST",
       body: new URLSearchParams({ page: location.pathname }),

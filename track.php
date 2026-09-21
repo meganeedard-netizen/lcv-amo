@@ -22,6 +22,12 @@ if ($ua === '' || preg_match('/bot|crawl|spider|slurp|facebookexternalhit|previe
     exit;
 }
 
+// Repère technique posé une fois par Mégane (via ?proprietaire=1) pour exclure ses propres visites.
+if (($_COOKIE['lcv_proprietaire'] ?? '') === '1') {
+    http_response_code(204);
+    exit;
+}
+
 $page = $_POST['page'] ?? '/';
 $page = preg_replace('/[^a-zA-Z0-9\/_\-\.]/', '', $page);
 $page = substr($page, 0, 200);
