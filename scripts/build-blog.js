@@ -27,6 +27,19 @@ const STATIC_PAGES = [
   { loc: "/politique-confidentialite.html", priority: "0.2" }
 ];
 
+/**
+ * Le champ `cover` du Markdown est écrit depuis la racine du site (ex.
+ * "assets/img/photo.jpg" ou "/content/uploads/photo.jpg" via Decap CMS).
+ * Les pages qui l'affichent vivent dans /blog/, donc il faut un "../"
+ * devant pour un usage en <img src>, et l'URL absolue pour og:image.
+ */
+function resolveCover(cover) {
+  if (!cover) return null;
+  if (/^https?:\/\//.test(cover)) return { src: cover, abs: cover };
+  const rootRelative = cover.startsWith("/") ? cover : `/${cover}`;
+  return { src: `..${rootRelative}`, abs: `${SITE_URL}${rootRelative}` };
+}
+
 function fmtDate(d) {
   return new Date(d).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
 }
@@ -140,9 +153,10 @@ function footer() {
 
 function articlePage(post) {
   const canonical = `${SITE_URL}/blog/${post.slug}.html`;
-  const ogImage = post.cover ? `${SITE_URL}${post.cover}` : `${SITE_URL}/assets/img/og-image.jpg`;
-  const cover = post.cover
-    ? `<div class="article-cover"><img src="${post.cover}" alt="${post.title}" loading="eager"></div>`
+  const resolvedCover = resolveCover(post.cover);
+  const ogImage = resolvedCover ? resolvedCover.abs : `${SITE_URL}/assets/img/og-image.jpg`;
+  const cover = resolvedCover
+    ? `<div class="article-cover"><img src="${resolvedCover.src}" alt="${post.title}" loading="eager"></div>`
     : "";
 
   return `<!doctype html>
@@ -202,7 +216,7 @@ function indexPage(posts) {
   const cards = posts
     .map(
       (p) => `        <article class="post-card">
-          <div class="post-card__media"><img src="${p.cover || "../assets/img/og-image.jpg"}" alt="" loading="lazy"></div>
+          <div class="post-card__media"><img src="${resolveCover(p.cover)?.src || "../assets/img/og-image.jpg"}" alt="" loading="lazy"></div>
           <div class="post-card__body">
             <span class="post-card__meta">${p.category}</span>
             <h3><a href="${p.slug}.html">${p.title}</a></h3>
