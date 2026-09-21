@@ -435,7 +435,7 @@ $titrePage = $typeActuel === 'blog' ? "Modifier l'article" : ($typeActuel === 'd
     return texte.replace(/\r\n/g, "\n").trim().split(/\n\s*\n/).map(function (b) { return b.trim(); }).filter(Boolean);
   }
 
-  // Même détection automatique des titres/listes que côté serveur (lib/texte.php : mettre_en_forme_auto()).
+  // Même détection automatique des titres que côté serveur (lib/texte.php : mettre_en_forme_auto()).
   function mettreEnFormeAuto(blocs) {
     var resultat = [];
     blocs.forEach(function (bloc) {
@@ -450,17 +450,7 @@ $titrePage = $typeActuel === 'blog' ? "Modifier l'article" : ($typeActuel === 'd
         return;
       }
 
-      var introDeuxPoints = /:\s*$/.test(lignes[0].replace(/\s+$/, ""));
-      var lignesPuces = introDeuxPoints ? lignes.slice(1) : lignes;
-      var nbFinPonctuee = lignesPuces.filter(function (l) { return /[;.]\s*$/.test(l); }).length;
-      var estListe = lignesPuces.length >= 2 && nbFinPonctuee >= lignesPuces.length - 1;
-
-      if (estListe) {
-        if (introDeuxPoints) resultat.push(lignes[0]);
-        resultat.push(lignesPuces.map(function (l) { return "- " + l; }).join("\n"));
-      } else {
-        resultat.push(lignes.join("\n"));
-      }
+      resultat.push(lignes.join("\n"));
     });
     return resultat;
   }

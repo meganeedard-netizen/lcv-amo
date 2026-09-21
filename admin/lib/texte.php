@@ -28,11 +28,11 @@ function paragraphes($texte) {
 }
 
 /**
- * Détecte automatiquement les titres et les listes dans le texte libre de
- * Fanny, pour qu'elle n'ait jamais besoin de taper de syntaxe Markdown.
+ * Détecte automatiquement les titres dans le texte libre de Fanny, pour
+ * qu'elle n'ait jamais besoin de taper de syntaxe Markdown.
  * - Une ligne seule, courte, sans ponctuation de fin de phrase → titre (## ).
- * - Plusieurs lignes dont la plupart finissent par ";" ou "." → liste (- ),
- *   avec une éventuelle ligne d'intro finissant par ":" gardée à part.
+ * (La détection automatique des listes a été retirée : peu fiable en
+ * pratique. Une mise en forme en liste se fait à la demande, à la main.)
  */
 function mettre_en_forme_auto(array $blocs) {
     $resultat = [];
@@ -50,19 +50,7 @@ function mettre_en_forme_auto(array $blocs) {
             continue;
         }
 
-        $introDeuxPoints = (bool) preg_match('/:\s*$/u', rtrim($lignes[0]));
-        $lignesPuces = $introDeuxPoints ? array_slice($lignes, 1) : $lignes;
-        $nbFinPonctuee = count(array_filter($lignesPuces, fn($l) => preg_match('/[;.]\s*$/u', $l)));
-        $estListe = count($lignesPuces) >= 2 && $nbFinPonctuee >= count($lignesPuces) - 1;
-
-        if ($estListe) {
-            if ($introDeuxPoints) {
-                $resultat[] = $lignes[0];
-            }
-            $resultat[] = implode("\n", array_map(fn($l) => "- $l", $lignesPuces));
-        } else {
-            $resultat[] = implode("\n", $lignes);
-        }
+        $resultat[] = implode("\n", $lignes);
     }
     return $resultat;
 }
