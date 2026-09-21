@@ -1,13 +1,19 @@
 <?php
 /**
- * Publication d'un article de blog par Fanny — sans jamais passer par GitHub.
- * Protégé par la même session que tableau-de-bord.php.
+ * Publication ET modification d'un article de blog par Fanny — sans jamais
+ * passer par GitHub. Protégé par la même session que tableau-de-bord.php.
  *
- * Au clic sur "Publier" : les photos sont redimensionnées/compressées, puis
- * le fichier Markdown de l'article et ses images sont envoyés sur GitHub via
- * l'API (jeton technique dans cms-token.php, jamais visible ici). Le
- * déploiement automatique existant (GitHub Actions) prend ensuite le relais :
- * l'article est en ligne quelques minutes plus tard.
+ * Trois usages, sur cette même page :
+ * - Nouvel article (aucun paramètre) : bouton "Enregistrer le brouillon" ou "Publier".
+ * - ?slug=xxx&type=draft : reprend un brouillon (content/drafts/xxx.md).
+ * - ?slug=xxx&type=blog : modifie un article déjà en ligne (content/blog/xxx.md),
+ *   un seul bouton "Mettre à jour l'article" (pas de notion de brouillon ici).
+ *
+ * Au clic sur "Publier"/"Mettre à jour" : les nouvelles photos sont
+ * redimensionnées/compressées, puis le fichier Markdown et ses images sont
+ * envoyés sur GitHub via l'API (jeton technique dans cms-token.php, jamais
+ * visible ici). Le déploiement automatique existant (GitHub Actions) prend
+ * ensuite le relais : l'article est en ligne quelques minutes plus tard.
  */
 
 session_start();
@@ -15,6 +21,7 @@ require __DIR__ . '/auth-config.php';
 require __DIR__ . '/lib/github.php';
 require __DIR__ . '/lib/image.php';
 require __DIR__ . '/lib/texte.php';
+require __DIR__ . '/lib/frontmatter.php';
 
 if (empty($_SESSION['lcv_admin'])) {
     header('Location: tableau-de-bord.php');
@@ -61,11 +68,56 @@ function fichier_upload_valide($champ) {
 
 $erreur = '';
 $succes = null;
+$messageBrouillon = false;
 $valeurs = ['titre' => '', 'sous_titre' => '', 'texte' => ''];
+$slugActuel = '';
+$typeActuel = '';
+$existant = ['cover' => '', 'date' => '', 'photos' => ['', '', '']];
+
+// Chargement d'un article ou d'un brouillon existant, pour modification
+$slugDemande = $_GET['slug'] ?? '';
+$typeDemande = $_GET['type'] ?? '';
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && $slugDemande !== '' && in_array($typeDemande, ['blog', 'draft'], true)) {
+    try {
+        $dossier = $typeDemande === 'blog' ? 'content/blog' : 'content/drafts';
+        $slugSur = basename($slugDemande);
+        $fichier = gh_get_file("$dossier/$slugSur.md");
+        if (!$fichier) {
+            $erreur = "Cet article est introuvable.";
+        } else {
+            $parse = frontmatter_parser($fichier['contenu']);
+            $valeurs['titre'] = $parse['data']['title'] ?? '';
+            $valeurs['sous_titre'] = $parse['data']['subtitle'] ?? '';
+            $extrait = extraire_texte_et_photos($parse['body']);
+            $valeurs['texte'] = $extrait['texte'];
+            $existant['cover'] = $parse['data']['cover'] ?? '';
+            $existant['date'] = $parse['data']['date'] ?? '';
+            foreach ($extrait['photos'] as $i => $chemin) {
+                if ($i < 3) {
+                    $existant['photos'][$i] = $chemin;
+                }
+            }
+            $slugActuel = $slugSur;
+            $typeActuel = $typeDemande;
+        }
+    } catch (GitHubPublishException $e) {
+        $erreur = $e->getMessage();
+    }
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES) && (int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > 0) {
     $erreur = "Les photos envoyées sont trop volumineuses pour le serveur. Réessaie avec des photos plus légères, ou moins nombreuses à la fois.";
 } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = $_POST['action'] ?? 'publier';
+    $slugActuel = $_POST['slug_existant'] ?? '';
+    $typeActuel = $_POST['type_existant'] ?? '';
+    $existant['cover'] = $_POST['cover_existant'] ?? '';
+    $existant['date'] = $_POST['date_existant'] ?? '';
+    $existant['photos'] = [
+        $_POST['photo1_existant'] ?? '',
+        $_POST['photo2_existant'] ?? '',
+        $_POST['photo3_existant'] ?? '',
+    ];
     $valeurs['titre'] = trim($_POST['titre'] ?? '');
     $valeurs['sous_titre'] = trim($_POST['sous_titre'] ?? '');
     $valeurs['texte'] = trim($_POST['texte'] ?? '');
@@ -77,27 +129,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES) && 
         if ($valeurs['texte'] === '') {
             throw new Exception("Le texte de l'article est obligatoire.");
         }
-        if (!fichier_upload_valide('vignette')) {
+
+        // Identifiant : on garde celui d'un article/brouillon existant, sinon on en calcule un nouveau.
+        if ($slugActuel !== '') {
+            $slug = basename($slugActuel);
+        } else {
+            $slug = slugifier($valeurs['titre']);
+            if ($slug === '') {
+                throw new Exception("Le titre doit contenir au moins une lettre ou un chiffre.");
+            }
+            $slugOriginal = $slug;
+            $compteur = 2;
+            while (gh_file_exists("content/blog/$slug.md") || gh_file_exists("content/drafts/$slug.md")) {
+                $slug = "$slugOriginal-$compteur";
+                $compteur++;
+            }
+        }
+
+        // Vignette : nouvelle photo, sinon celle déjà en place
+        if (fichier_upload_valide('vignette')) {
+            $donneesVignette = image_vers_jpeg_optimise($_FILES['vignette']['tmp_name']);
+            $cheminVignette = "content/uploads/$slug-vignette.jpg";
+            gh_put_file($cheminVignette, $donneesVignette, "Ajoute la vignette de l'article \"{$valeurs['titre']}\"");
+        } elseif ($existant['cover'] !== '') {
+            $cheminVignette = $existant['cover'];
+        } else {
             throw new Exception("La photo de vignette est obligatoire.");
         }
 
-        $slug = slugifier($valeurs['titre']);
-        if ($slug === '') {
-            throw new Exception("Le titre doit contenir au moins une lettre ou un chiffre.");
-        }
-        $slugOriginal = $slug;
-        $compteur = 2;
-        while (gh_file_exists("content/blog/$slug.md")) {
-            $slug = "$slugOriginal-$compteur";
-            $compteur++;
-        }
-
-        // Vignette
-        $donneesVignette = image_vers_jpeg_optimise($_FILES['vignette']['tmp_name']);
-        $cheminVignette = "content/uploads/$slug-vignette.jpg";
-        gh_put_file($cheminVignette, $donneesVignette, "Ajoute la vignette de l'article \"{$valeurs['titre']}\"");
-
-        // Jusqu'à 3 photos dans le corps de l'article
+        // Jusqu'à 3 photos dans le corps de l'article : nouvelle photo, conservée, ou retirée
         $urlsPhotos = [];
         foreach (['photo1', 'photo2', 'photo3'] as $i => $champ) {
             if (fichier_upload_valide($champ)) {
@@ -105,6 +165,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES) && 
                 $chemin = "content/uploads/$slug-photo" . ($i + 1) . ".jpg";
                 gh_put_file($chemin, $donnees, "Ajoute une photo de l'article \"{$valeurs['titre']}\"");
                 $urlsPhotos[] = "/$chemin";
+            } elseif (empty($_POST['supprimer_' . $champ]) && !empty($existant['photos'][$i])) {
+                $urlsPhotos[] = $existant['photos'][$i];
             }
         }
 
@@ -114,24 +176,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES) && 
         $corps = implode("\n\n", $blocs);
 
         $resume = resume_court($valeurs['sous_titre'] !== '' ? $valeurs['sous_titre'] : $valeurs['texte']);
-        $date = date('Y-m-d');
+        $date = $existant['date'] !== '' ? $existant['date'] : date('Y-m-d');
 
-        $frontmatterYaml = "---\n"
-            . 'title: "' . yaml_valeur($valeurs['titre']) . "\"\n"
-            . 'slug: "' . $slug . "\"\n"
-            . 'date: ' . $date . "\n"
-            . 'category: "Actualités"' . "\n"
-            . 'excerpt: "' . yaml_valeur($resume) . "\"\n"
-            . 'cover: "' . $cheminVignette . "\"\n";
-        if ($valeurs['sous_titre'] !== '') {
-            $frontmatterYaml .= 'subtitle: "' . yaml_valeur($valeurs['sous_titre']) . "\"\n";
+        $data = [
+            'title' => $valeurs['titre'],
+            'slug' => $slug,
+            'date' => $date,
+            'category' => 'Actualités',
+            'excerpt' => $resume,
+            'cover' => $cheminVignette,
+            'subtitle' => $valeurs['sous_titre'],
+        ];
+        $texteMarkdown = frontmatter_ecrire($data, $corps);
+
+        if ($action === 'brouillon') {
+            $fichierExistant = gh_get_file("content/drafts/$slug.md");
+            gh_put_file("content/drafts/$slug.md", $texteMarkdown, "Enregistre le brouillon \"{$valeurs['titre']}\"", $fichierExistant['sha'] ?? null);
+
+            $messageBrouillon = true;
+            $slugActuel = $slug;
+            $typeActuel = 'draft';
+            $existant['cover'] = $cheminVignette;
+            $existant['date'] = $date;
+            $existant['photos'] = array_pad($urlsPhotos, 3, '');
+        } else {
+            $fichierExistant = gh_get_file("content/blog/$slug.md");
+            gh_put_file("content/blog/$slug.md", $texteMarkdown, "Publie l'article \"{$valeurs['titre']}\"", $fichierExistant['sha'] ?? null);
+
+            if ($typeActuel === 'draft') {
+                $brouillon = gh_get_file("content/drafts/$slug.md");
+                if ($brouillon) {
+                    gh_delete_file("content/drafts/$slug.md", $brouillon['sha'], "Supprime le brouillon publié \"$slug\"");
+                }
+            }
+
+            $succes = $slug;
+            $valeurs = ['titre' => '', 'sous_titre' => '', 'texte' => ''];
+            $slugActuel = '';
+            $typeActuel = '';
+            $existant = ['cover' => '', 'date' => '', 'photos' => ['', '', '']];
         }
-        $frontmatterYaml .= "---\n\n" . $corps . "\n";
-
-        gh_put_file("content/blog/$slug.md", $frontmatterYaml, "Publie l'article \"{$valeurs['titre']}\"");
-
-        $succes = $slug;
-        $valeurs = ['titre' => '', 'sous_titre' => '', 'texte' => ''];
 
     } catch (GitHubPublishException $e) {
         $erreur = $e->getMessage();
@@ -141,13 +225,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES) && 
         $erreur = $e->getMessage();
     }
 }
+
+$titrePage = $typeActuel === 'blog' ? "Modifier l'article" : ($typeActuel === 'draft' ? "Continuer le brouillon" : "Publier un article de blog");
 ?>
 <!doctype html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Publier un article | La Clef de Voûte</title>
+<title><?= e($titrePage) ?> | La Clef de Voûte</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="../assets/img/favicon.ico" sizes="any">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -165,7 +251,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES) && 
   .wrap { max-width: 720px; margin: 0 auto; padding: 32px 20px 80px; }
   h1 { font-family: var(--font-display); color: var(--navy); font-size: 1.5rem; margin: 0 0 6px; }
   .sous-titre-page { color: var(--gray-text); font-size: 0.92rem; margin: 0 0 26px; }
-  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; flex-wrap: wrap; gap: 8px; }
   a.retour { color: var(--navy); font-size: 0.88rem; text-decoration: none; font-weight: 600; }
   a.retour:hover { text-decoration: underline; }
 
@@ -181,13 +267,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES) && 
   input[type=file] { width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px dashed var(--stone-line); background: var(--offwhite); font-size: 0.9rem; }
   .photos-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
   .photos-grid > div { margin-top: 0; }
+  .photo-existante { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .photo-existante img { width: 56px; height: 42px; object-fit: cover; border-radius: 6px; background: var(--stone-soft); }
+  .photo-existante label { display: flex; align-items: center; gap: 5px; margin: 0; font-weight: 400; font-size: 0.8rem; color: var(--gray-text); }
+  .photo-existante input[type=checkbox] { width: auto; }
 
   button.btn { font-family: var(--font-body); font-weight: 700; font-size: 1rem; padding: 13px 24px; border-radius: 999px; border: none; cursor: pointer; background: var(--pink); color: #fff; margin-top: 12px; width: 100%; }
   button.btn:hover { background: var(--pink-deep); }
   button.btn:disabled { opacity: 0.6; cursor: wait; }
   button.btn--ghost { background: transparent; color: var(--navy); border: 1px solid var(--stone-line); }
   button.btn--ghost:hover { background: var(--stone-soft); }
-  .actions { margin-top: 24px; }
+  .actions { margin-top: 24px; display: flex; flex-direction: column; gap: 4px; }
 
   .message { border-radius: var(--radius-sm); padding: 14px 16px; font-size: 0.9rem; margin-bottom: 20px; }
   .message--erreur { background: #FBE7EE; color: var(--pink-deep); }
@@ -206,13 +296,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES) && 
 <div class="wrap">
 
   <div class="topbar">
-    <a class="retour" href="tableau-de-bord.php">← Retour au tableau de bord</a>
+    <a class="retour" href="tableau-de-bord.php">← Tableau de bord</a>
+    <a class="retour" href="articles.php">📚 Mes articles</a>
   </div>
-  <h1>Publier un article de blog</h1>
-  <p class="sous-titre-page">La mise en page est automatique, reprend le style du site. L'article est en ligne quelques minutes après la publication.</p>
+  <h1><?= e($titrePage) ?></h1>
+  <p class="sous-titre-page">La mise en page est automatique, reprend le style du site.
+  <?= $typeActuel === 'blog' ? "Les modifications sont en ligne quelques minutes après validation." : "L'article est en ligne quelques minutes après la publication." ?></p>
 
   <?php if ($erreur): ?>
     <div class="message message--erreur">⚠️ <?= e($erreur) ?></div>
+  <?php endif; ?>
+
+  <?php if ($messageBrouillon): ?>
+    <div class="message message--succes">💾 Brouillon enregistré. Tu peux continuer plus tard depuis <a href="articles.php">Mes articles</a>.</div>
   <?php endif; ?>
 
   <?php if ($succes): ?>
@@ -224,7 +320,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES) && 
   <?php endif; ?>
 
   <div class="panel">
-    <form method="post" enctype="multipart/form-data" onsubmit="setTimeout(function(){ var b=document.getElementById('btn-publier'); b.disabled=true; b.textContent='Publication en cours…'; }, 0);">
+    <form method="post" enctype="multipart/form-data" id="form-article">
+
+      <input type="hidden" name="slug_existant" value="<?= e($slugActuel) ?>">
+      <input type="hidden" name="type_existant" value="<?= e($typeActuel) ?>">
+      <input type="hidden" name="cover_existant" value="<?= e($existant['cover']) ?>">
+      <input type="hidden" name="date_existant" value="<?= e($existant['date']) ?>">
+      <input type="hidden" id="cover_existant_url" value="<?= e(gh_raw_url($existant['cover'])) ?>">
+      <?php foreach ([0, 1, 2] as $i): ?>
+        <input type="hidden" name="photo<?= $i + 1 ?>_existant" value="<?= e($existant['photos'][$i]) ?>">
+        <input type="hidden" id="photo<?= $i + 1 ?>_existant_url" value="<?= e(gh_raw_url($existant['photos'][$i])) ?>">
+      <?php endforeach; ?>
 
       <label for="titre">Titre de l'article</label>
       <input type="text" id="titre" name="titre" required value="<?= e($valeurs['titre']) ?>">
@@ -234,13 +340,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES) && 
 
       <label for="vignette">Photo de vignette</label>
       <p class="aide" style="margin:-4px 0 6px;">Celle qui apparaît en haut de l'article et dans la liste du blog.</p>
-      <input type="file" id="vignette" name="vignette" accept="image/jpeg,image/png,image/webp" required>
+      <?php if ($existant['cover']): ?>
+        <div class="photo-existante">
+          <img src="<?= e(gh_raw_url($existant['cover'])) ?>" alt="">
+          <span class="aide">Vignette actuelle — choisis un fichier ci-dessous pour la remplacer</span>
+        </div>
+      <?php endif; ?>
+      <input type="file" id="vignette" name="vignette" accept="image/jpeg,image/png,image/webp" <?= $existant['cover'] ? '' : 'required' ?>>
 
       <label>Photos dans l'article <span class="aide">(facultatif, jusqu'à 3 — placées automatiquement dans le texte)</span></label>
       <div class="photos-grid">
-        <div><input type="file" name="photo1" accept="image/jpeg,image/png,image/webp"></div>
-        <div><input type="file" name="photo2" accept="image/jpeg,image/png,image/webp"></div>
-        <div><input type="file" name="photo3" accept="image/jpeg,image/png,image/webp"></div>
+        <?php foreach ([0, 1, 2] as $i): $champ = 'photo' . ($i + 1); ?>
+          <div>
+            <?php if ($existant['photos'][$i]): ?>
+              <div class="photo-existante">
+                <img src="<?= e(gh_raw_url($existant['photos'][$i])) ?>" alt="">
+                <label><input type="checkbox" name="supprimer_<?= $champ ?>" value="1"> Retirer</label>
+              </div>
+            <?php endif; ?>
+            <input type="file" name="<?= $champ ?>" accept="image/jpeg,image/png,image/webp">
+          </div>
+        <?php endforeach; ?>
       </div>
 
       <label for="texte">Texte de l'article</label>
@@ -248,8 +368,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES) && 
       <textarea id="texte" name="texte" required><?= e($valeurs['texte']) ?></textarea>
 
       <div class="actions">
-        <button type="button" id="btn-apercu" class="btn btn--ghost">👁️ Aperçu avant publication</button>
-        <button type="submit" id="btn-publier" class="btn">Publier l'article</button>
+        <button type="button" id="btn-apercu" class="btn btn--ghost">👁️ Aperçu</button>
+        <?php if ($typeActuel === 'blog'): ?>
+          <button type="submit" name="action" value="publier" class="btn">Mettre à jour l'article</button>
+        <?php else: ?>
+          <button type="submit" name="action" value="brouillon" class="btn btn--ghost">💾 Enregistrer le brouillon</button>
+          <button type="submit" name="action" value="publier" class="btn">Publier l'article</button>
+        <?php endif; ?>
       </div>
     </form>
   </div>
@@ -307,17 +432,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES) && 
     return "<p>" + echapper(texte).replace(/\n+/g, " ") + "</p>";
   }
 
+  function urlPhotoActuelle(nomChamp, idExistante) {
+    var fichier = document.querySelector('[name="' + nomChamp + '"]').files[0];
+    if (fichier) return URL.createObjectURL(fichier);
+    var champSupprimer = document.querySelector('[name="supprimer_' + nomChamp + '"]');
+    if (champSupprimer && champSupprimer.checked) return null;
+    var urlExistante = document.getElementById(idExistante);
+    return urlExistante && urlExistante.value ? urlExistante.value : null;
+  }
+
   function ouvrirApercu() {
     var titre = document.getElementById("titre").value.trim() || "Titre de l'article";
     var sousTitre = document.getElementById("sous_titre").value.trim();
     var texte = document.getElementById("texte").value.trim();
-    var vignette = document.getElementById("vignette").files[0];
-    var photos = ["photo1", "photo2", "photo3"]
-      .map(function (nom) { return document.querySelector('[name="' + nom + '"]').files[0]; })
-      .filter(Boolean);
 
-    var urlVignette = vignette ? URL.createObjectURL(vignette) : "";
-    var urlsPhotos = photos.map(function (f) { return URL.createObjectURL(f); });
+    var vignetteFichier = document.getElementById("vignette").files[0];
+    var urlVignette = vignetteFichier ? URL.createObjectURL(vignetteFichier) : (document.getElementById("cover_existant_url").value || "");
+
+    var urlsPhotos = ["photo1", "photo2", "photo3"]
+      .map(function (nom) { return urlPhotoActuelle(nom, nom + "_existant_url"); })
+      .filter(Boolean);
 
     var blocs = texte ? insererPhotos(paragraphes(texte), urlsPhotos) : [];
     var corpsHtml = blocs.map(function (b) {
@@ -347,6 +481,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES) && 
   document.getElementById("btn-apercu").addEventListener("click", ouvrirApercu);
   document.getElementById("btn-fermer-apercu").addEventListener("click", function () {
     document.getElementById("apercu").close();
+  });
+
+  document.getElementById("form-article").addEventListener("submit", function (e) {
+    var cliquePar = e.submitter;
+    setTimeout(function () {
+      document.querySelectorAll(".actions button").forEach(function (b) { b.disabled = true; });
+      if (cliquePar) cliquePar.textContent = "Envoi en cours…";
+    }, 0);
   });
 })();
 </script>

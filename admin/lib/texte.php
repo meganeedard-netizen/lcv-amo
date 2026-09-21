@@ -33,6 +33,23 @@ function yaml_valeur($texte) {
     return str_replace(["\r", "\n"], ' ', $texte);
 }
 
+/**
+ * Sépare le corps Markdown d'un article en texte "libre" et liste des photos
+ * qui y avaient été insérées automatiquement (inverse de inserer_photos()).
+ */
+function extraire_texte_et_photos($corpsMarkdown) {
+    $texte = [];
+    $photos = [];
+    foreach (paragraphes($corpsMarkdown) as $bloc) {
+        if (preg_match('/^!\[[^\]]*\]\(([^)]+)\)$/', $bloc, $m)) {
+            $photos[] = $m[1];
+        } else {
+            $texte[] = $bloc;
+        }
+    }
+    return ['texte' => implode("\n\n", $texte), 'photos' => $photos];
+}
+
 /** Résumé court (pour la balise meta description et la vignette de la liste du blog). */
 function resume_court($texte, $longueurMax = 160) {
     $texte = trim(preg_replace('/\s+/', ' ', $texte));
