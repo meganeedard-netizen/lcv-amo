@@ -37,7 +37,20 @@ function resolveCover(cover) {
   if (!cover) return null;
   if (/^https?:\/\//.test(cover)) return { src: cover, abs: cover };
   const rootRelative = cover.startsWith("/") ? cover : `/${cover}`;
-  return { src: `..${rootRelative}`, abs: `${SITE_URL}${rootRelative}` };
+
+  // Cache-busting : le CDN garde une image en cache 7 jours par URL. Si un
+  // article republie une photo sous le même nom de fichier (même slug), il
+  // faut une URL différente pour que la nouvelle photo s'affiche tout de
+  // suite. On utilise la date de modification du fichier comme version.
+  let version = "";
+  try {
+    const mtime = fs.statSync(path.join(ROOT, rootRelative.slice(1))).mtimeMs;
+    version = `?v=${Math.round(mtime)}`;
+  } catch {
+    // Fichier introuvable au moment du build : pas de version, tant pis.
+  }
+
+  return { src: `..${rootRelative}${version}`, abs: `${SITE_URL}${rootRelative}${version}` };
 }
 
 function fmtDate(d) {
