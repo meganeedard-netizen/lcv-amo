@@ -6,22 +6,73 @@
 <title>Administration | La Clef de Voûte</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="/assets/img/favicon.ico" sizes="any">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  body { font-family: -apple-system, sans-serif; }
-  .lien-tableau-de-bord {
-    position: fixed; top: 14px; right: 18px; z-index: 9999;
-    font-family: -apple-system, sans-serif; font-size: 13px; font-weight: 600;
-    background: #862762; color: #fff; padding: 8px 14px; border-radius: 999px;
-    text-decoration: none; box-shadow: 0 6px 16px -6px rgba(0,0,0,.3);
+  :root {
+    --navy: #242E47;
+    --navy-deep: #1A2132;
+    --pink: #862762;
+    --pink-deep: #5F1C45;
+    --offwhite: #FAF9F6;
+    --white: #FFFFFF;
+    --gray-text: #55565C;
+    --font-display: 'Space Grotesk', Arial, sans-serif;
+    --font-body: 'Manrope', Arial, sans-serif;
+    --radius: 14px;
   }
-  .lien-tableau-de-bord:hover { background: #5F1C45; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-body);
+    background: var(--offwhite);
+    color: var(--navy-deep);
+  }
+  .box {
+    max-width: 380px;
+    width: 100%;
+    margin: 24px;
+    background: var(--white);
+    padding: 32px;
+    border-radius: var(--radius);
+    box-shadow: 0 12px 32px -16px rgba(23,26,61,.25);
+    text-align: center;
+  }
+  h1 {
+    font-family: var(--font-display);
+    color: var(--navy);
+    font-size: 1.4rem;
+    margin: 0 0 6px;
+  }
+  p {
+    color: var(--gray-text);
+    font-size: 0.9rem;
+    margin: 0 0 22px;
+  }
+  a.btn {
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 0.95rem;
+    padding: 12px 22px;
+    border-radius: 999px;
+    background: var(--pink);
+    color: #fff;
+    text-decoration: none;
+    display: inline-block;
+  }
+  a.btn:hover { background: var(--pink-deep); }
 </style>
-<!-- Decap CMS (ex Netlify CMS), back-office de publication du blog. -->
-<!-- Le paquet "decap-cms" (autonome, React inclus, s'initialise tout seul) est utilisé
-     ici plutôt que "decap-cms-app" (librairie bas niveau qui ne s'auto-démarre pas). -->
-<script src="https://cdn.jsdelivr.net/npm/decap-cms@3.16.2/dist/decap-cms.js" defer></script>
 </head>
 <body>
-<a class="lien-tableau-de-bord" href="tableau-de-bord.php">📊 Tableau de bord</a>
+<div class="box">
+  <h1>Espace administration</h1>
+  <p>La Clef de Voûte</p>
+  <a class="btn" href="tableau-de-bord.php">Se connecter à mon tableau de bord</a>
+</div>
 </body>
 </html>

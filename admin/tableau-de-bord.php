@@ -175,7 +175,7 @@ function e($texte) {
       <h1>Tableau de bord — La Clef de Voûte</h1>
       <div class="topbar-actions">
         <a href="../index.html" class="btn btn--ghost" target="_blank" rel="noopener">Voir le site</a>
-        <a href="index.html" class="btn btn--pink">✍️ Publier un article de blog</a>
+        <a href="cms/index.html" class="btn btn--pink">✍️ Publier un article de blog</a>
         <a href="?deconnexion=1" class="btn btn--ghost">Déconnexion</a>
       </div>
     </div>
