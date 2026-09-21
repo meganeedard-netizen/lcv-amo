@@ -57,6 +57,8 @@ function e($texte) {
     --navy-deep: #1A2132;
     --pink: #862762;
     --pink-deep: #5F1C45;
+    --violet: #6E4DA8;
+    --violet-deep: #52397F;
     --stone-soft: #E9E8E3;
     --stone-line: #C7C5BC;
     --offwhite: #FAF9F6;
@@ -92,6 +94,8 @@ function e($texte) {
   .btn--pink:hover { background: var(--pink-deep); }
   .btn--ghost { background: transparent; color: var(--navy); border: 1px solid var(--stone-line); }
   .btn--ghost:hover { background: var(--stone-soft); }
+  .btn--violet { background: var(--violet); color: #fff; }
+  .btn--violet:hover { background: var(--violet-deep); }
 
   .login-box {
     max-width: 380px; margin: 12vh auto; background: var(--white);
@@ -175,8 +179,7 @@ function e($texte) {
       <h1>Tableau de bord — La Clef de Voûte</h1>
       <div class="topbar-actions">
         <a href="../index.html" class="btn btn--ghost" target="_blank" rel="noopener">Voir le site</a>
-        <a href="articles.php" class="btn btn--ghost">📚 Mes articles</a>
-        <a href="publier-article.php" class="btn btn--pink">✍️ Publier un article de blog</a>
+        <a href="articles.php" class="btn btn--violet">✍️ Mes articles de blog</a>
         <a href="?deconnexion=1" class="btn btn--ghost">Déconnexion</a>
       </div>
     </div>

@@ -122,6 +122,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES) && 
     $valeurs['sous_titre'] = trim($_POST['sous_titre'] ?? '');
     $valeurs['texte'] = trim($_POST['texte'] ?? '');
 
+    if ($action === 'supprimer') {
+        try {
+            if ($slugActuel === '' || !in_array($typeActuel, ['blog', 'draft'], true)) {
+                throw new Exception("Rien à supprimer.");
+            }
+            $dossier = $typeActuel === 'blog' ? 'content/blog' : 'content/drafts';
+            $slugSur = basename($slugActuel);
+            $fichier = gh_get_file("$dossier/$slugSur.md");
+            if (!$fichier) {
+                throw new Exception("Introuvable, peut-être déjà supprimé.");
+            }
+            gh_delete_file("$dossier/$slugSur.md", $fichier['sha'], "Supprime " . ($typeActuel === 'blog' ? "l'article" : "le brouillon") . " \"$slugSur\"");
+            header('Location: articles.php');
+            exit;
+        } catch (GitHubPublishException $e) {
+            $erreur = $e->getMessage();
+        } catch (Exception $e) {
+            $erreur = $e->getMessage();
+        }
+    } else {
     try {
         if ($valeurs['titre'] === '') {
             throw new Exception("Le titre est obligatoire.");
@@ -224,6 +244,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES) && 
     } catch (Exception $e) {
         $erreur = $e->getMessage();
     }
+    }
 }
 
 $titrePage = $typeActuel === 'blog' ? "Modifier l'article" : ($typeActuel === 'draft' ? "Continuer le brouillon" : "Publier un article de blog");
@@ -297,7 +318,7 @@ $titrePage = $typeActuel === 'blog' ? "Modifier l'article" : ($typeActuel === 'd
 
   <div class="topbar">
     <a class="retour" href="tableau-de-bord.php">← Tableau de bord</a>
-    <a class="retour" href="articles.php">📚 Mes articles</a>
+    <a class="retour" href="articles.php">✍️ Mes articles de blog</a>
   </div>
   <h1><?= e($titrePage) ?></h1>
   <p class="sous-titre-page">La mise en page est automatique, reprend le style du site.
@@ -375,6 +396,9 @@ $titrePage = $typeActuel === 'blog' ? "Modifier l'article" : ($typeActuel === 'd
           <button type="submit" name="action" value="brouillon" class="btn btn--ghost">💾 Enregistrer le brouillon</button>
           <button type="submit" name="action" value="publier" class="btn">Publier l'article</button>
         <?php endif; ?>
+        <?php if ($slugActuel !== ''): ?>
+          <button type="submit" name="action" value="supprimer" class="btn btn--ghost" style="color:#B3261E; margin-top:14px;" onclick="return confirm('<?= $typeActuel === 'blog' ? "Supprimer cet article définitivement ? Il ne sera plus visible sur le site." : "Supprimer ce brouillon définitivement ?" ?>');">🗑️ <?= $typeActuel === 'blog' ? "Supprimer l'article" : "Supprimer le brouillon" ?></button>
+        <?php endif; ?>
       </div>
     </form>
   </div>
@@ -408,7 +432,7 @@ $titrePage = $typeActuel === 'blog' ? "Modifier l'article" : ($typeActuel === 'd
   function insererPhotos(blocs, urlsPhotos) {
     var n = blocs.length, k = urlsPhotos.length;
     if (k === 0 || n === 0) {
-      return blocs.concat(urlsPhotos.map(function (u) { return { photo: u }; }));
+      return blocs.map(function (b) { return { texte: b }; }).concat(urlsPhotos.map(function (u) { return { photo: u }; }));
     }
     var positions = [];
     for (var i = 1; i <= k; i++) {

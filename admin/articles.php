@@ -36,6 +36,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'suppr
     exit;
 }
 
+// Suppression d'un article publié
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'supprimer_article') {
+    try {
+        $slug = basename($_POST['slug'] ?? '');
+        $fichier = gh_get_file("content/blog/$slug.md");
+        if ($fichier) {
+            gh_delete_file("content/blog/$slug.md", $fichier['sha'], "Supprime l'article \"$slug\"");
+        }
+    } catch (GitHubPublishException $e) {
+        $erreur = $e->getMessage();
+    }
+    header('Location: articles.php');
+    exit;
+}
+
 function charger_liste($dossier) {
     $items = [];
     foreach (gh_list_dir($dossier) as $fichier) {
@@ -169,6 +184,11 @@ try {
       <div class="actions">
         <a href="publier-article.php?slug=<?= urlencode($a['slug']) ?>&type=blog" class="btn btn--pink">Modifier</a>
         <a href="https://lcv-amo.fr/blog/<?= urlencode($a['slug']) ?>.html" target="_blank" rel="noopener" class="btn btn--ghost">Voir en ligne</a>
+        <form method="post" onsubmit="return confirm('Supprimer cet article définitivement ? Il ne sera plus visible sur le site.');" style="margin:0;">
+          <input type="hidden" name="action" value="supprimer_article">
+          <input type="hidden" name="slug" value="<?= e($a['slug']) ?>">
+          <button type="submit" class="btn btn--ghost">Supprimer</button>
+        </form>
       </div>
     </div>
   <?php endforeach; endif; ?>
