@@ -27,6 +27,46 @@ function paragraphes($texte) {
     return array_values(array_filter(array_map('trim', $blocs), fn($b) => $b !== ''));
 }
 
+/**
+ * Détecte automatiquement les titres et les listes dans le texte libre de
+ * Fanny, pour qu'elle n'ait jamais besoin de taper de syntaxe Markdown.
+ * - Une ligne seule, courte, sans ponctuation de fin de phrase → titre (## ).
+ * - Plusieurs lignes dont la plupart finissent par ";" ou "." → liste (- ),
+ *   avec une éventuelle ligne d'intro finissant par ":" gardée à part.
+ */
+function mettre_en_forme_auto(array $blocs) {
+    $resultat = [];
+    foreach ($blocs as $bloc) {
+        $lignes = array_values(array_filter(array_map('trim', explode("\n", $bloc)), fn($l) => $l !== ''));
+        if (!$lignes) {
+            continue;
+        }
+
+        if (count($lignes) === 1) {
+            $ligne = $lignes[0];
+            $dejaBalise = (bool) preg_match('/^(#|-|!\[)/', $ligne);
+            $estTitre = !$dejaBalise && mb_strlen($ligne) <= 80 && !preg_match('/[.!?…:]\s*$/u', $ligne);
+            $resultat[] = $estTitre ? "## $ligne" : $ligne;
+            continue;
+        }
+
+        $introDeuxPoints = (bool) preg_match('/:\s*$/u', rtrim($lignes[0]));
+        $lignesPuces = $introDeuxPoints ? array_slice($lignes, 1) : $lignes;
+        $nbFinPonctuee = count(array_filter($lignesPuces, fn($l) => preg_match('/[;.]\s*$/u', $l)));
+        $estListe = count($lignesPuces) >= 2 && $nbFinPonctuee >= count($lignesPuces) - 1;
+
+        if ($estListe) {
+            if ($introDeuxPoints) {
+                $resultat[] = $lignes[0];
+            }
+            $resultat[] = implode("\n", array_map(fn($l) => "- $l", $lignesPuces));
+        } else {
+            $resultat[] = implode("\n", $lignes);
+        }
+    }
+    return $resultat;
+}
+
 /** Échappe une valeur pour l'insérer dans une chaîne YAML entre guillemets doubles. */
 function yaml_valeur($texte) {
     $texte = str_replace(["\\", '"'], ["\\\\", '\\"'], $texte);
@@ -43,6 +83,13 @@ function extraire_texte_et_photos($corpsMarkdown) {
     foreach (paragraphes($corpsMarkdown) as $bloc) {
         if (preg_match('/^!\[[^\]]*\]\(([^)]+)\)$/', $bloc, $m)) {
             $photos[] = $m[1];
+        } elseif (preg_match('/^##\s+(.+)$/', $bloc, $m)) {
+            // Titre détecté automatiquement à la publication : on retire le "## ".
+            $texte[] = $m[1];
+        } elseif (preg_match('/^-\s+/', $bloc)) {
+            // Liste détectée automatiquement à la publication : on retire le "- " de chaque ligne.
+            $lignes = array_map(fn($l) => preg_replace('/^-\s+/', '', $l), explode("\n", $bloc));
+            $texte[] = implode("\n", $lignes);
         } else {
             $texte[] = $bloc;
         }

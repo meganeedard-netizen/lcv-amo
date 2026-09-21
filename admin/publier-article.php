@@ -191,7 +191,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES) && 
         }
 
         // Corps du texte, avec les photos réparties dedans
-        $paragraphesTexte = paragraphes($valeurs['texte']);
+        $paragraphesTexte = mettre_en_forme_auto(paragraphes($valeurs['texte']));
         $blocs = inserer_photos($paragraphesTexte, $urlsPhotos);
         $corps = implode("\n\n", $blocs);
 
@@ -416,6 +416,7 @@ $titrePage = $typeActuel === 'blog' ? "Modifier l'article" : ($typeActuel === 'd
   <iframe id="apercu-iframe" title="Aperçu de l'article"></iframe>
 </dialog>
 
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
 <script>
 (function () {
   "use strict";
@@ -429,6 +430,36 @@ $titrePage = $typeActuel === 'blog' ? "Modifier l'article" : ($typeActuel === 'd
   // Même découpage en paragraphes que côté serveur (lib/texte.php : paragraphes()).
   function paragraphes(texte) {
     return texte.replace(/\r\n/g, "\n").trim().split(/\n\s*\n/).map(function (b) { return b.trim(); }).filter(Boolean);
+  }
+
+  // Même détection automatique des titres/listes que côté serveur (lib/texte.php : mettre_en_forme_auto()).
+  function mettreEnFormeAuto(blocs) {
+    var resultat = [];
+    blocs.forEach(function (bloc) {
+      var lignes = bloc.split("\n").map(function (l) { return l.trim(); }).filter(Boolean);
+      if (!lignes.length) return;
+
+      if (lignes.length === 1) {
+        var ligne = lignes[0];
+        var dejaBalise = /^(#|-|!\[)/.test(ligne);
+        var estTitre = !dejaBalise && ligne.length <= 80 && !/[.!?…:]\s*$/.test(ligne);
+        resultat.push(estTitre ? "## " + ligne : ligne);
+        return;
+      }
+
+      var introDeuxPoints = /:\s*$/.test(lignes[0].replace(/\s+$/, ""));
+      var lignesPuces = introDeuxPoints ? lignes.slice(1) : lignes;
+      var nbFinPonctuee = lignesPuces.filter(function (l) { return /[;.]\s*$/.test(l); }).length;
+      var estListe = lignesPuces.length >= 2 && nbFinPonctuee >= lignesPuces.length - 1;
+
+      if (estListe) {
+        if (introDeuxPoints) resultat.push(lignes[0]);
+        resultat.push(lignesPuces.map(function (l) { return "- " + l; }).join("\n"));
+      } else {
+        resultat.push(lignes.join("\n"));
+      }
+    });
+    return resultat;
   }
 
   // Même répartition des photos dans le texte que côté serveur (publier-article.php : inserer_photos()).
@@ -454,11 +485,6 @@ $titrePage = $typeActuel === 'blog' ? "Modifier l'article" : ($typeActuel === 'd
     return resultat;
   }
 
-  function paragrapheVersHtml(texte) {
-    // Un seul retour à la ligne = un espace (comme marked par défaut), comme au moment de la publication réelle.
-    return "<p>" + echapper(texte).replace(/\n+/g, " ") + "</p>";
-  }
-
   function urlPhotoActuelle(nomChamp, idExistante) {
     var fichier = document.querySelector('[name="' + nomChamp + '"]').files[0];
     if (fichier) return URL.createObjectURL(fichier);
@@ -480,10 +506,13 @@ $titrePage = $typeActuel === 'blog' ? "Modifier l'article" : ($typeActuel === 'd
       .map(function (nom) { return urlPhotoActuelle(nom, nom + "_existant_url"); })
       .filter(Boolean);
 
-    var blocs = texte ? insererPhotos(paragraphes(texte), urlsPhotos) : [];
-    var corpsHtml = blocs.map(function (b) {
-      return b.photo ? '<img src="' + b.photo + '" alt="">' : paragrapheVersHtml(b.texte);
-    }).join("\n");
+    var blocsFormes = texte ? mettreEnFormeAuto(paragraphes(texte)) : [];
+    var blocs = insererPhotos(blocsFormes, urlsPhotos);
+    var corpsMarkdown = blocs.map(function (b) {
+      return b.photo ? "![](" + b.photo + ")" : b.texte;
+    }).join("\n\n");
+    // Même moteur Markdown → HTML que la publication réelle (scripts/build-blog.js), pour un aperçu fidèle.
+    var corpsHtml = window.marked ? marked.parse(corpsMarkdown) : "<p>" + echapper(corpsMarkdown) + "</p>";
 
     var dateAujourdhui = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
 
