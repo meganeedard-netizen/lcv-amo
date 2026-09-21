@@ -385,7 +385,10 @@ $titrePage = $typeActuel === 'blog' ? "Modifier l'article" : ($typeActuel === 'd
       </div>
 
       <label for="texte">Texte de l'article</label>
-      <p class="aide" style="margin:-4px 0 6px;">Laisse une ligne vide entre deux paragraphes.</p>
+      <p class="aide" style="margin:-4px 0 6px;">Laisse une ligne vide entre deux paragraphes. Sélectionne un mot et clique sur Gras pour le mettre en valeur.</p>
+      <div style="margin-bottom:6px;">
+        <button type="button" id="btn-gras" class="btn btn--ghost" style="padding:6px 14px; font-size:.82rem; font-weight:700;">𝐁 Gras</button>
+      </div>
       <textarea id="texte" name="texte" required><?= e($valeurs['texte']) ?></textarea>
 
       <div class="actions">
@@ -485,6 +488,16 @@ $titrePage = $typeActuel === 'blog' ? "Modifier l'article" : ($typeActuel === 'd
     return resultat;
   }
 
+  function mettreEnGras(champ) {
+    var debut = champ.selectionStart, fin = champ.selectionEnd;
+    var valeur = champ.value;
+    var selection = valeur.slice(debut, fin) || "texte en gras";
+    champ.value = valeur.slice(0, debut) + "**" + selection + "**" + valeur.slice(fin);
+    champ.focus();
+    champ.selectionStart = debut + 2;
+    champ.selectionEnd = debut + 2 + selection.length;
+  }
+
   function urlPhotoActuelle(nomChamp, idExistante) {
     var fichier = document.querySelector('[name="' + nomChamp + '"]').files[0];
     if (fichier) return URL.createObjectURL(fichier);
@@ -535,6 +548,9 @@ $titrePage = $typeActuel === 'blog' ? "Modifier l'article" : ($typeActuel === 'd
   }
 
   document.getElementById("btn-apercu").addEventListener("click", ouvrirApercu);
+  document.getElementById("btn-gras").addEventListener("click", function () {
+    mettreEnGras(document.getElementById("texte"));
+  });
   document.getElementById("btn-fermer-apercu").addEventListener("click", function () {
     document.getElementById("apercu").close();
   });
