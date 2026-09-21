@@ -392,12 +392,15 @@ $titrePage = $typeActuel === 'blog' ? "Modifier l'article" : ($typeActuel === 'd
         <button type="button" id="btn-apercu" class="btn btn--ghost">👁️ Aperçu</button>
         <?php if ($typeActuel === 'blog'): ?>
           <button type="submit" name="action" value="publier" class="btn">Mettre à jour l'article</button>
+          <?php if ($slugActuel !== ''): ?>
+            <button type="submit" name="action" value="supprimer" class="btn btn--ghost" style="color:#B3261E; margin-top:14px;" onclick="return confirm('Supprimer cet article définitivement ? Il ne sera plus visible sur le site.');">🗑️ Supprimer l'article</button>
+          <?php endif; ?>
         <?php else: ?>
           <button type="submit" name="action" value="brouillon" class="btn btn--ghost">💾 Enregistrer le brouillon</button>
-          <button type="submit" name="action" value="publier" class="btn">Publier l'article</button>
-        <?php endif; ?>
-        <?php if ($slugActuel !== ''): ?>
-          <button type="submit" name="action" value="supprimer" class="btn btn--ghost" style="color:#B3261E; margin-top:14px;" onclick="return confirm('<?= $typeActuel === 'blog' ? "Supprimer cet article définitivement ? Il ne sera plus visible sur le site." : "Supprimer ce brouillon définitivement ?" ?>');">🗑️ <?= $typeActuel === 'blog' ? "Supprimer l'article" : "Supprimer le brouillon" ?></button>
+          <?php if ($slugActuel !== ''): ?>
+            <button type="submit" name="action" value="supprimer" class="btn btn--ghost" style="color:#B3261E;" onclick="return confirm('Supprimer ce brouillon définitivement ?');">🗑️ Supprimer le brouillon</button>
+          <?php endif; ?>
+          <button type="submit" name="action" value="publier" class="btn" style="margin-top:14px;">Publier l'article</button>
         <?php endif; ?>
       </div>
     </form>
