@@ -182,14 +182,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES) && 
   .photos-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
   .photos-grid > div { margin-top: 0; }
 
-  button.btn { font-family: var(--font-body); font-weight: 700; font-size: 1rem; padding: 13px 24px; border-radius: 999px; border: none; cursor: pointer; background: var(--pink); color: #fff; margin-top: 28px; width: 100%; }
+  button.btn { font-family: var(--font-body); font-weight: 700; font-size: 1rem; padding: 13px 24px; border-radius: 999px; border: none; cursor: pointer; background: var(--pink); color: #fff; margin-top: 12px; width: 100%; }
   button.btn:hover { background: var(--pink-deep); }
   button.btn:disabled { opacity: 0.6; cursor: wait; }
+  button.btn--ghost { background: transparent; color: var(--navy); border: 1px solid var(--stone-line); }
+  button.btn--ghost:hover { background: var(--stone-soft); }
+  .actions { margin-top: 24px; }
 
   .message { border-radius: var(--radius-sm); padding: 14px 16px; font-size: 0.9rem; margin-bottom: 20px; }
   .message--erreur { background: #FBE7EE; color: var(--pink-deep); }
   .message--succes { background: #E9F5EC; color: #1E6B3A; }
   .message--succes a { color: inherit; font-weight: 700; }
+
+  dialog#apercu { padding: 0; border: none; border-radius: var(--radius); width: min(900px, 92vw); height: 88vh; box-shadow: 0 20px 60px -20px rgba(23,26,61,.4); }
+  dialog#apercu::backdrop { background: rgba(26,33,50,.55); }
+  .apercu-barre { display: flex; align-items: center; justify-content: space-between; padding: 12px 18px; background: var(--navy); color: #fff; font-size: 0.85rem; font-weight: 600; }
+  .apercu-barre button { font-family: var(--font-body); background: rgba(255,255,255,.15); color: #fff; border: none; border-radius: 999px; padding: 6px 14px; cursor: pointer; font-size: 0.82rem; }
+  .apercu-barre button:hover { background: rgba(255,255,255,.25); }
+  #apercu iframe { width: 100%; height: calc(88vh - 46px); border: none; display: block; }
 </style>
 </head>
 <body>
@@ -237,10 +247,108 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES) && 
       <p class="aide" style="margin:-4px 0 6px;">Laisse une ligne vide entre deux paragraphes.</p>
       <textarea id="texte" name="texte" required><?= e($valeurs['texte']) ?></textarea>
 
-      <button type="submit" id="btn-publier" class="btn">Publier l'article</button>
+      <div class="actions">
+        <button type="button" id="btn-apercu" class="btn btn--ghost">👁️ Aperçu avant publication</button>
+        <button type="submit" id="btn-publier" class="btn">Publier l'article</button>
+      </div>
     </form>
   </div>
 
 </div>
+
+<dialog id="apercu">
+  <div class="apercu-barre">
+    <span>Aperçu — cet article n'est pas encore publié</span>
+    <button type="button" id="btn-fermer-apercu">Fermer ✕</button>
+  </div>
+  <iframe id="apercu-iframe" title="Aperçu de l'article"></iframe>
+</dialog>
+
+<script>
+(function () {
+  "use strict";
+
+  function echapper(texte) {
+    var d = document.createElement("div");
+    d.textContent = texte;
+    return d.innerHTML;
+  }
+
+  // Même découpage en paragraphes que côté serveur (lib/texte.php : paragraphes()).
+  function paragraphes(texte) {
+    return texte.replace(/\r\n/g, "\n").trim().split(/\n\s*\n/).map(function (b) { return b.trim(); }).filter(Boolean);
+  }
+
+  // Même répartition des photos dans le texte que côté serveur (publier-article.php : inserer_photos()).
+  function insererPhotos(blocs, urlsPhotos) {
+    var n = blocs.length, k = urlsPhotos.length;
+    if (k === 0 || n === 0) {
+      return blocs.concat(urlsPhotos.map(function (u) { return { photo: u }; }));
+    }
+    var positions = [];
+    for (var i = 1; i <= k; i++) {
+      var pos = Math.round(n * i / (k + 1));
+      pos = Math.max(1, Math.min(n, pos));
+      while (positions.indexOf(pos) !== -1 && pos < n) pos++;
+      positions.push(pos);
+    }
+    var resultat = [];
+    blocs.forEach(function (bloc, index) {
+      resultat.push({ texte: bloc });
+      var numero = index + 1;
+      var i2 = positions.indexOf(numero);
+      if (i2 !== -1) resultat.push({ photo: urlsPhotos[i2] });
+    });
+    return resultat;
+  }
+
+  function paragrapheVersHtml(texte) {
+    // Un seul retour à la ligne = un espace (comme marked par défaut), comme au moment de la publication réelle.
+    return "<p>" + echapper(texte).replace(/\n+/g, " ") + "</p>";
+  }
+
+  function ouvrirApercu() {
+    var titre = document.getElementById("titre").value.trim() || "Titre de l'article";
+    var sousTitre = document.getElementById("sous_titre").value.trim();
+    var texte = document.getElementById("texte").value.trim();
+    var vignette = document.getElementById("vignette").files[0];
+    var photos = ["photo1", "photo2", "photo3"]
+      .map(function (nom) { return document.querySelector('[name="' + nom + '"]').files[0]; })
+      .filter(Boolean);
+
+    var urlVignette = vignette ? URL.createObjectURL(vignette) : "";
+    var urlsPhotos = photos.map(function (f) { return URL.createObjectURL(f); });
+
+    var blocs = texte ? insererPhotos(paragraphes(texte), urlsPhotos) : [];
+    var corpsHtml = blocs.map(function (b) {
+      return b.photo ? '<img src="' + b.photo + '" alt="">' : paragrapheVersHtml(b.texte);
+    }).join("\n");
+
+    var dateAujourdhui = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+
+    var doc = '<!doctype html><html lang="fr"><head><meta charset="UTF-8">'
+      + '<link rel="preconnect" href="https://fonts.googleapis.com">'
+      + '<link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">'
+      + '<link rel="stylesheet" href="../assets/css/style.css">'
+      + '<style>body{padding:40px 20px 80px;}</style></head><body>'
+      + '<main id="main"><article><div class="container article-header">'
+      + '<span class="eyebrow">Actualités</span>'
+      + '<h1>' + echapper(titre) + '</h1>'
+      + (sousTitre ? '<p class="lede">' + echapper(sousTitre) + '</p>' : '')
+      + '<div class="article-meta"><span>Par Fanny Prieto</span><span>' + dateAujourdhui + '</span></div>'
+      + (urlVignette ? '<div class="article-cover"><img src="' + urlVignette + '" alt=""></div>' : '')
+      + '</div><div class="container"><div class="article-body">' + corpsHtml + '</div></div>'
+      + '</article></main></body></html>';
+
+    document.getElementById("apercu-iframe").srcdoc = doc;
+    document.getElementById("apercu").showModal();
+  }
+
+  document.getElementById("btn-apercu").addEventListener("click", ouvrirApercu);
+  document.getElementById("btn-fermer-apercu").addEventListener("click", function () {
+    document.getElementById("apercu").close();
+  });
+})();
+</script>
 </body>
 </html>
