@@ -170,7 +170,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES) && 
         if (fichier_upload_valide('vignette')) {
             $donneesVignette = image_vers_jpeg_optimise($_FILES['vignette']['tmp_name']);
             $cheminVignette = "content/uploads/$slug-vignette.jpg";
-            gh_put_file($cheminVignette, $donneesVignette, "Ajoute la vignette de l'article \"{$valeurs['titre']}\"");
+            $vignetteExistante = gh_get_file($cheminVignette);
+            gh_put_file($cheminVignette, $donneesVignette, "Ajoute la vignette de l'article \"{$valeurs['titre']}\"", $vignetteExistante['sha'] ?? null);
         } elseif ($existant['cover'] !== '') {
             $cheminVignette = $existant['cover'];
         } else {
@@ -183,7 +184,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES) && 
             if (fichier_upload_valide($champ)) {
                 $donnees = image_vers_jpeg_optimise($_FILES[$champ]['tmp_name']);
                 $chemin = "content/uploads/$slug-photo" . ($i + 1) . ".jpg";
-                gh_put_file($chemin, $donnees, "Ajoute une photo de l'article \"{$valeurs['titre']}\"");
+                $photoExistante = gh_get_file($chemin);
+                gh_put_file($chemin, $donnees, "Ajoute une photo de l'article \"{$valeurs['titre']}\"", $photoExistante['sha'] ?? null);
                 $urlsPhotos[] = "/$chemin";
             } elseif (empty($_POST['supprimer_' . $champ]) && !empty($existant['photos'][$i])) {
                 $urlsPhotos[] = $existant['photos'][$i];
@@ -191,7 +193,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES) && 
         }
 
         // Corps du texte, avec les photos réparties dedans
-        $paragraphesTexte = mettre_en_forme_auto(paragraphes($valeurs['texte']));
+        $paragraphesTexte = paragraphes($valeurs['texte']);
         $blocs = inserer_photos($paragraphesTexte, $urlsPhotos);
         $corps = implode("\n\n", $blocs);
 
@@ -435,26 +437,6 @@ $titrePage = $typeActuel === 'blog' ? "Modifier l'article" : ($typeActuel === 'd
     return texte.replace(/\r\n/g, "\n").trim().split(/\n\s*\n/).map(function (b) { return b.trim(); }).filter(Boolean);
   }
 
-  // Même détection automatique des titres que côté serveur (lib/texte.php : mettre_en_forme_auto()).
-  function mettreEnFormeAuto(blocs) {
-    var resultat = [];
-    blocs.forEach(function (bloc) {
-      var lignes = bloc.split("\n").map(function (l) { return l.trim(); }).filter(Boolean);
-      if (!lignes.length) return;
-
-      if (lignes.length === 1) {
-        var ligne = lignes[0];
-        var dejaBalise = /^(#|-|!\[)/.test(ligne);
-        var estTitre = !dejaBalise && ligne.length <= 80 && !/[.!?…:]\s*$/.test(ligne);
-        resultat.push(estTitre ? "## " + ligne : ligne);
-        return;
-      }
-
-      resultat.push(lignes.join("\n"));
-    });
-    return resultat;
-  }
-
   // Même répartition des photos dans le texte que côté serveur (publier-article.php : inserer_photos()).
   function insererPhotos(blocs, urlsPhotos) {
     var n = blocs.length, k = urlsPhotos.length;
@@ -509,8 +491,7 @@ $titrePage = $typeActuel === 'blog' ? "Modifier l'article" : ($typeActuel === 'd
       .map(function (nom) { return urlPhotoActuelle(nom, nom + "_existant_url"); })
       .filter(Boolean);
 
-    var blocsFormes = texte ? mettreEnFormeAuto(paragraphes(texte)) : [];
-    var blocs = insererPhotos(blocsFormes, urlsPhotos);
+    var blocs = insererPhotos(texte ? paragraphes(texte) : [], urlsPhotos);
     var corpsMarkdown = blocs.map(function (b) {
       return b.photo ? "![](" + b.photo + ")" : b.texte;
     }).join("\n\n");

@@ -27,34 +27,6 @@ function paragraphes($texte) {
     return array_values(array_filter(array_map('trim', $blocs), fn($b) => $b !== ''));
 }
 
-/**
- * Détecte automatiquement les titres dans le texte libre de Fanny, pour
- * qu'elle n'ait jamais besoin de taper de syntaxe Markdown.
- * - Une ligne seule, courte, sans ponctuation de fin de phrase → titre (## ).
- * (La détection automatique des listes a été retirée : peu fiable en
- * pratique. Une mise en forme en liste se fait à la demande, à la main.)
- */
-function mettre_en_forme_auto(array $blocs) {
-    $resultat = [];
-    foreach ($blocs as $bloc) {
-        $lignes = array_values(array_filter(array_map('trim', explode("\n", $bloc)), fn($l) => $l !== ''));
-        if (!$lignes) {
-            continue;
-        }
-
-        if (count($lignes) === 1) {
-            $ligne = $lignes[0];
-            $dejaBalise = (bool) preg_match('/^(#|-|!\[)/', $ligne);
-            $estTitre = !$dejaBalise && mb_strlen($ligne) <= 80 && !preg_match('/[.!?…:]\s*$/u', $ligne);
-            $resultat[] = $estTitre ? "## $ligne" : $ligne;
-            continue;
-        }
-
-        $resultat[] = implode("\n", $lignes);
-    }
-    return $resultat;
-}
-
 /** Échappe une valeur pour l'insérer dans une chaîne YAML entre guillemets doubles. */
 function yaml_valeur($texte) {
     $texte = str_replace(["\\", '"'], ["\\\\", '\\"'], $texte);
