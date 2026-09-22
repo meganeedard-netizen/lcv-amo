@@ -24,7 +24,7 @@ if (!is_array($mailConfig)) {
     exit;
 }
 
-function envoyerEmail(array $mailConfig, $destinataire, $sujet, $corps, $replyToNom = null, $replyToEmail = null) {
+function envoyerEmail(array $mailConfig, $destinataire, $sujet, $corps, $replyToNom = null, $replyToEmail = null, $fromEmail = null, $fromNom = 'La Clef de Voûte') {
     $mail = new PHPMailer(true);
     try {
         $mail->isSMTP();
@@ -36,7 +36,7 @@ function envoyerEmail(array $mailConfig, $destinataire, $sujet, $corps, $replyTo
         $mail->Port       = $mailConfig['smtp_port'];
         $mail->CharSet    = 'UTF-8';
 
-        $mail->setFrom($mailConfig['smtp_user'], 'La Clef de Voûte');
+        $mail->setFrom($fromEmail ?: $mailConfig['smtp_user'], $fromNom);
         $mail->addAddress($destinataire);
         if ($replyToEmail) {
             $mail->addReplyTo($replyToEmail, $replyToNom ?: $replyToEmail);
@@ -129,7 +129,9 @@ $corps .= "Téléphone : {$telephone}\n";
 $corps .= "Type de projet : {$typeProjet}\n\n";
 $corps .= "Message :\n{$message}\n";
 
-$envoye = envoyerEmail($mailConfig, $destinataire, $sujet, $corps, $nom, $email);
+// Expéditeur distinct du destinataire pour éviter le classement en spam
+// (un mail envoyé de contact@lcv-amo.fr vers lui-même est souvent filtré).
+$envoye = envoyerEmail($mailConfig, $destinataire, $sujet, $corps, $nom, $email, 'no-reply@lcv-amo.fr', 'Formulaire de contact — lcv-amo.fr');
 
 if ($envoye) {
     // Email de confirmation envoyé au visiteur
@@ -141,7 +143,7 @@ if ($envoye) {
     $corpsConfirmation .= "À très bientôt,\n";
     $corpsConfirmation .= "La Clef de Voûte, Assistance à Maîtrise d'Ouvrage\n";
 
-    envoyerEmail($mailConfig, $email, $sujetConfirmation, $corpsConfirmation);
+    envoyerEmail($mailConfig, $email, $sujetConfirmation, $corpsConfirmation, 'La Clef de Voûte', $destinataire, 'no-reply@lcv-amo.fr', 'La Clef de Voûte');
 
     enregistrerDemande([
         'date'        => date('c'),
