@@ -161,7 +161,8 @@ function footer() {
   </div>
 </footer>
 
-<script src="../assets/js/main.js"></script>`;
+<script src="../assets/js/main.js"></script>
+<script src="../assets/js/consent.js"></script>`;
 }
 
 function articlePage(post) {
